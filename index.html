@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game: Dũng Sĩ An Toàn Mạng</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;700;900&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Be Vietnam Pro', sans-serif;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        .card {
+            background: white;
+            border-radius: 1.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            transition: all 0.3s ease-in-out;
+        }
+        .btn {
+            transition: all 0.2s ease-in-out;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .answer-btn.correct {
+            background-color: #22c55e !important;
+            color: white !important;
+            border-color: #16a34a !important;
+        }
+        .answer-btn.wrong {
+            background-color: #ef4444 !important;
+            color: white !important;
+            border-color: #dc2626 !important;
+        }
+        /* Drag and Drop Styles */
+        .draggable-item {
+            cursor: grab;
+            user-select: none;
+        }
+        .drop-zone.drag-over {
+            transform: scale(1.02);
+            border-style: solid;
+            box-shadow: 0 0 20px rgba(37, 99, 235, 0.3);
+        }
+        .draggable-item.correct-drop {
+            background-color: #dcfce7; /* green-100 */
+            border-color: #22c55e; /* green-500 */
+            cursor: not-allowed;
+        }
+        /* Spot the Fake Styles */
+        .message-part {
+            cursor: pointer;
+            transition: background-color 0.2s;
+            border-radius: 4px;
+            padding: 2px 4px;
+            margin: -2px -4px; /* Offset padding */
+        }
+        .message-part:hover:not(.found) {
+            background-color: #fef9c3; /* yellow-100 */
+        }
+        .message-part.found {
+            background-color: #dcfce7; /* green-100 */
+            border: 1px solid #16a34a; /* green-600 */
+            cursor: default;
+            font-weight: 500;
+        }
+        .message-part.not-clue {
+            background-color: #fee2e2; /* red-100 */
+            animation: shake 0.5s;
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            75% { transform: translateX(5px); }
+        }
+    </style>
+</head>
+<body class="bg-blue-50 flex items-center justify-center min-h-screen p-4">
+
+    <div id="game-container" class="max-w-xl lg:max-w-2xl w-full mx-auto">
+
+        <!-- === MÀN HÌNH BẮT ĐẦU (CHỌN GAME) === -->
+        <div id="start-screen" class="card text-center p-8">
+            <div class="flex justify-center mb-4">
+                 <svg class="w-20 h-20 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                </svg>
+            </div>
+            <h1 class="text-3xl md:text-4xl font-black text-blue-600 mb-2">DŨNG SĨ AN TOÀN MẠNG</h1>
+            <p class="text-gray-600 mb-6">Chọn một thử thách để chứng tỏ sự tỉnh táo của bạn trên không gian mạng!</p>
+            <div class="space-y-4">
+                 <button id="start-quiz-btn" class="btn w-full bg-orange-500 text-white font-bold py-3 px-6 rounded-xl text-lg hover:bg-orange-600">Trắc nghiệm Tình huống</button>
+                 <button id="start-dnd-btn" class="btn w-full bg-teal-500 text-white font-bold py-3 px-6 rounded-xl text-lg hover:bg-teal-600">Phân loại An toàn/Rủi ro</button>
+                 <button id="start-spotting-btn" class="btn w-full bg-purple-500 text-white font-bold py-3 px-6 rounded-xl text-lg hover:bg-purple-600">Phát Hiện Tin Nhắn Giả Mạo</button>
+            </div>
+        </div>
+
+        <!-- === MÀN HÌNH TRẮC NGHIỆM === -->
+        <div id="quiz-screen" class="card p-6 md:p-8 hidden">
+            <div class="flex justify-between items-center mb-4">
+                <div id="question-counter" class="text-sm font-semibold text-gray-500">Câu hỏi 1/15</div>
+                <div id="score-quiz" class="text-lg font-bold text-blue-600">Điểm: 0</div>
+            </div>
+            <div id="question-text" class="text-xl font-bold text-gray-800 mb-6 min-h-[100px]"></div>
+            <div id="answer-buttons" class="grid grid-cols-1 gap-4"></div>
+            <div id="feedback-quiz" class="mt-6 text-center font-medium min-h-[40px]"></div>
+        </div>
+
+        <!-- === MÀN HÌNH KÉO THẢ (DND) === -->
+        <div id="dnd-screen" class="card p-6 md:p-8 hidden">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold text-blue-600">Phân Loại Hành Động</h2>
+                <div id="score-dnd" class="text-lg font-bold text-blue-600">Điểm: 0</div>
+            </div>
+            <p class="text-center text-gray-500 mb-6">Kéo các hành động bên dưới vào ô "An Toàn" hoặc "Rủi Ro".</p>
+            <div class="grid grid-cols-2 gap-4 mb-6">
+                <div id="safe-zone" data-type="safe" class="drop-zone bg-green-50 border-2 border-dashed border-green-400 rounded-lg p-4 min-h-[250px] space-y-2">
+                    <h3 class="font-bold text-green-800 text-center mb-2">✅ AN TOÀN</h3>
+                </div>
+                <div id="risky-zone" data-type="risky" class="drop-zone bg-red-50 border-2 border-dashed border-red-400 rounded-lg p-4 min-h-[250px] space-y-2">
+                    <h3 class="font-bold text-red-800 text-center mb-2">❌ RỦI RO</h3>
+                </div>
+            </div>
+            <div id="items-container" class="flex flex-wrap justify-center gap-3 p-2 bg-gray-100 rounded-lg min-h-[100px]"></div>
+            <div id="feedback-dnd" class="mt-4 text-center font-medium min-h-[24px]"></div>
+        </div>
+
+        <!-- === MÀN HÌNH PHÁT HIỆN GIẢ MẠO === -->
+        <div id="spotting-screen" class="card p-6 md:p-8 hidden">
+            <div class="flex justify-between items-center mb-2">
+                <h2 class="text-2xl font-bold text-blue-600">Phát Hiện Giả Mạo</h2>
+                <div id="score-spotting" class="text-lg font-bold text-blue-600">Điểm: 0</div>
+            </div>
+            <p id="spotting-instruction" class="text-center text-gray-500 mb-4">Nhấp vào những điểm đáng ngờ trong tin nhắn bên dưới.</p>
+            
+            <div id="message-container" class="bg-gray-50 border rounded-lg p-4 space-y-3 mb-4">
+                <!-- Message content will be generated here -->
+            </div>
+            <div id="explanation-spotting" class="text-center text-sm font-semibold text-blue-700 min-h-[20px] mb-4"></div>
+
+            <div class="flex justify-between items-center mt-4">
+                <div id="clues-counter" class="text-sm font-semibold text-gray-600">Đã tìm thấy: 0/3</div>
+                <button id="next-message-btn" class="btn bg-gray-300 text-white font-bold py-2 px-4 rounded-lg cursor-not-allowed" disabled>Tiếp theo</button>
+            </div>
+        </div>
+
+
+        <!-- === MÀN HÌNH KẾT THÚC === -->
+        <div id="end-screen" class="card text-center p-8 hidden">
+            <h2 class="text-3xl font-black text-blue-600 mb-2">THỬ THÁCH KẾT THÚC!</h2>
+            <p class="text-lg text-gray-700 mb-4">Điểm số cuối cùng của bạn là:</p>
+            <div id="final-score" class="text-6xl font-black text-orange-500 mb-6">0</div>
+            <div id="end-message" class="text-gray-600 mb-8"></div>
+            <button id="restart-btn" class="btn w-full bg-blue-500 text-white font-bold py-3 px-6 rounded-xl text-lg hover:bg-blue-600">Chơi lại</button>
+        </div>
+    </div>
+
+    <script>
+        // DOM Elements
+        const startScreen = document.getElementById('start-screen');
+        const endScreen = document.getElementById('end-screen');
+        const startQuizBtn = document.getElementById('start-quiz-btn');
+        const startDndBtn = document.getElementById('start-dnd-btn');
+        const startSpottingBtn = document.getElementById('start-spotting-btn');
+        const restartBtn = document.getElementById('restart-btn');
+        const finalScore = document.getElementById('final-score');
+        const endMessage = document.getElementById('end-message');
+        
+        let score = 0;
+        let activeGame = '';
+
+        // === QUIZ GAME ===
+        const quizScreen = document.getElementById('quiz-screen');
+        const questionCounter = document.getElementById('question-counter');
+        const scoreQuizDisplay = document.getElementById('score-quiz');
+        const questionText = document.getElementById('question-text');
+        const answerButtonsContainer = document.getElementById('answer-buttons');
+        const feedbackQuiz = document.getElementById('feedback-quiz');
+        let currentQuestionIndex = 0;
+        const quizQuestions = [
+            { question: 'Bạn nhận được email trúng thưởng điện thoại và yêu cầu bấm vào link. Bạn sẽ làm gì?', answers: [{ text: 'Bấm ngay!', correct: false }, { text: 'Xóa ngay email. Đây là lừa đảo.', correct: true }, { text: 'Trả lời email hỏi thêm.', correct: false }], explanation: 'Đúng! Quà "từ trên trời" thường là bẫy.' },
+            { question: 'Người bạn mới quen trên mạng xin mật khẩu tài khoản game để "cày level giúp". Bạn sẽ?', answers: [{ text: 'Tuyệt đối không đưa.', correct: true }, { text: 'Đưa cho bạn ấy.', correct: false }, { text: 'Đưa mật khẩu nhưng dặn không đổi.', correct: false }], explanation: 'Chính xác! Không bao giờ chia sẻ mật khẩu.' },
+            { question: 'Link tải phần mềm chỉnh ảnh "xịn" được chia sẻ trong nhóm. Bạn nên làm gì?', answers: [{ text: 'Tải về ngay.', correct: false }, { text: 'Chỉ tải phần mềm từ trang web chính thức.', correct: true }, { text: 'Hỏi xem có ai dùng chưa.', correct: false }], explanation: 'Rất cẩn thận! Tệp lạ có thể chứa virus.' },
+            { question: 'Người lạ tự xưng là nhân viên ngân hàng yêu cầu bạn cung cấp mã OTP. Bạn sẽ?', answers: [{ text: 'Cung cấp ngay.', correct: false }, { text: 'Chặn và báo cho bố mẹ.', correct: true }, { text: 'Hỏi họ tên để xác thực.', correct: false }], explanation: 'Tuyệt vời! Không bao giờ chia sẻ mã OTP.' },
+            { question: 'Bạn nhận được tin nhắn/hình ảnh đáng sợ, bạn nên làm gì nhất?', answers: [{ text: 'Im lặng tự giải quyết.', correct: false }, { text: 'Tranh cãi với họ.', correct: false }, { text: 'Chặn và nói ngay cho bố mẹ/thầy cô.', correct: true }], explanation: 'Đúng! Chia sẻ với người lớn là cách tốt nhất.' },
+            { question: 'Bạn của bạn nhắn tin Facebook, nói đang cần gấp thẻ cào và hứa trả sau. Bạn nên làm gì?', answers: [{ text: 'Mua và gửi ngay cho bạn.', correct: false }, { text: 'Gọi điện hoặc gặp trực tiếp để xác nhận.', correct: true }, { text: 'Nhắn lại hỏi tại sao cần gấp.', correct: false }], explanation: 'Rất tốt! Luôn xác minh bằng kênh khác, vì tài khoản bạn bè có thể đã bị hack.' },
+            { question: 'Trang mạng bán vé concert của thần tượng giá rẻ, yêu cầu chuyển khoản trước. Bạn sẽ?', answers: [{ text: 'Chuyển khoản ngay kẻo hết vé.', correct: false }, { text: 'Chỉ mua vé từ các kênh phân phối chính thức.', correct: true }, { text: 'Rủ thêm bạn bè cùng mua chung.', correct: false }], explanation: 'Chính xác! Vé giá rẻ bất ngờ và yêu cầu chuyển khoản trước thường là lừa đảo.' },
+            { question: 'Bạn mới quen trên mạng rủ bạn bỏ nhà đi "phiêu lưu". Bạn nên làm gì?', answers: [{ text: 'Tin lời và chuẩn bị đi cùng.', correct: false }, { text: 'Chặn người đó và kể ngay cho bố mẹ.', correct: true }, { text: 'Nói dối bố mẹ để đi thử xem sao.', correct: false }], explanation: 'Đúng đắn! Người lạ trên mạng có thể là kẻ xấu. Hãy luôn tin tưởng gia đình.' },
+            { question: 'Người lạ trên mạng muốn gửi quà đắt tiền, nhưng yêu cầu bạn đóng "phí hải quan". Bạn nên?', answers: [{ text: 'Vay tiền để đóng phí nhận quà.', correct: false }, { text: 'Nhận ra đây là lừa đảo và chặn họ ngay.', correct: true }, { text: 'Hỏi họ gửi món quà khác không cần phí.', correct: false }], explanation: 'Tỉnh táo! Yêu cầu đóng phí để nhận quà luôn là dấu hiệu lừa đảo.' },
+            { question: 'Quảng cáo tuyển "người mẫu nhí" online yêu cầu bạn gửi ảnh cá nhân và số đo cơ thể. Bạn làm gì?', answers: [{ text: 'Gửi ngay để nổi tiếng.', correct: false }, { text: 'Báo cho bố mẹ và cùng tìm hiểu về công ty đó.', correct: true }, { text: 'Chỉ gửi những ảnh mình thấy đẹp.', correct: false }], explanation: 'Rất cẩn thận! Không bao giờ gửi ảnh nhạy cảm cho người lạ. Luôn có sự đồng hành của bố mẹ.' },
+            { question: 'Khi dùng Wi-Fi công cộng, bạn muốn đăng nhập tài khoản mạng xã hội. Bạn nên?', answers: [{ text: 'Thoải mái đăng nhập vì có mật khẩu mạnh.', correct: false }, { text: 'Hạn chế đăng nhập, nếu cần thì dùng 4G/5G.', correct: true }, { text: 'Đăng nhập nhanh rồi đăng xuất ngay.', correct: false }], explanation: 'An toàn là trên hết! Wi-Fi công cộng không an toàn, kẻ xấu có thể đánh cắp thông tin.' },
+            { question: 'Người lạ nhắn tin dọa nạt, nói biết địa chỉ nhà bạn. Bạn sẽ?', answers: [{ text: 'Sợ hãi và làm theo yêu cầu.', correct: false }, { text: 'Không trả lời, chụp màn hình và báo ngay cho bố mẹ.', correct: true }, { text: 'Chửi lại và thách thức họ.', correct: false }], explanation: 'Bình tĩnh và xử lý rất tốt! Đây là cách đúng đắn để bảo vệ bản thân.' },
+            { question: 'Một trang web quảng cáo "tool hack" vật phẩm game miễn phí, chỉ cần điền mật khẩu. Bạn có thử không?', answers: [{ text: 'Thử ngay để có nhiều đồ xịn.', correct: false }, { text: 'Tuyệt đối không. Đây là trang web lừa đảo để lấy cắp tài khoản.', correct: true }, { text: 'Tạo tài khoản phụ để thử trước.', correct: false }], explanation: 'Chính xác! Các trang "hack" game luôn là bẫy để đánh cắp tài khoản.' },
+            { question: 'Bài quiz "Bạn giống người nổi tiếng nào" yêu cầu quyền truy cập danh sách bạn bè. Bạn sẽ?', answers: [{ text: 'Chấp nhận hết để chơi cho vui.', correct: false }, { text: 'Từ chối và không chơi. Thông tin cá nhân quan trọng hơn.', correct: true }, { text: 'Chơi xong rồi hủy quyền truy cập sau.', correct: false }], explanation: 'Thông minh! Các quiz này thường là cách để thu thập dữ liệu cá nhân của bạn.' },
+            { question: 'Bạn nhận được lời mời kết bạn từ tài khoản lạ, không có bạn chung. Bạn nên làm gì?', answers: [{ text: 'Đồng ý ngay vì ảnh đại diện đẹp.', correct: false }, { text: 'Không đồng ý. Đây có thể là tài khoản giả mạo.', correct: true }, { text: 'Nhắn tin hỏi họ là ai.', correct: false }], explanation: 'Rất cẩn trọng! Không nên kết bạn với người không quen biết trên mạng.' }
+        ];
+
+        // === DRAG AND DROP GAME ===
+        const dndScreen = document.getElementById('dnd-screen');
+        const scoreDndDisplay = document.getElementById('score-dnd');
+        const itemsContainer = document.getElementById('items-container');
+        const dropZones = document.querySelectorAll('.drop-zone');
+        const feedbackDnd = document.getElementById('feedback-dnd');
+        let draggedItem = null;
+        let remainingItems = 0;
+        const dndItems = [
+            { text: "Chia sẻ mật khẩu với bạn thân", type: "risky" }, { text: "Dùng chung mật khẩu cho nhiều tài khoản", type: "risky" }, { text: "Báo cho bố mẹ khi gặp tin nhắn lạ", type: "safe" }, { text: "Nhấp vào link quà tặng miễn phí", type: "risky" }, { text: "Bật xác thực hai yếu tố", type: "safe" }, { text: "Tải game từ một trang web không rõ", type: "risky" }, { text: "Che camera trên máy tính khi không dùng", type: "safe" }, { text: "Kết bạn với tất cả mọi người", type: "risky" }, { text: "Sử dụng mật khẩu mạnh (dài, có ký tự đặc biệt)", type: "safe" }, { text: "Đăng ảnh vé máy bay lên mạng", type: "risky" },
+        ];
+        
+        // === SPOTTING GAME ===
+        const spottingScreen = document.getElementById('spotting-screen');
+        const scoreSpottingDisplay = document.getElementById('score-spotting');
+        const messageContainer = document.getElementById('message-container');
+        const cluesCounter = document.getElementById('clues-counter');
+        const nextMessageBtn = document.getElementById('next-message-btn');
+        const explanationSpotting = document.getElementById('explanation-spotting');
+        let currentScenarioIndex = 0;
+        let foundClues = 0;
+        const spottingScenarios = [
+            {
+                parts: [
+                    { text: 'Từ: DịchVụGiaoHàng <info@giaohang-sieutoc.xyz>', clue: true, explanation: 'Địa chỉ email lạ, không phải tên miền chính thức.' },
+                    { text: 'Chủ đề: THÔNG BÁO KHẨN: Bưu kiện của bạn bị giữ lại!', clue: true, explanation: 'Tiêu đề gây hoang mang, hối thúc là một dấu hiệu lừa đảo.' },
+                    { text: 'Chào bạn, chúng tôi không thể giao bưu kiện của bạn vì thiếu thông tin. Vui lòng cập nhật và thanh toán phí 25.000đ tại đây:', clue: false },
+                    { text: 'bit.ly/nhan-hang-ngay', clue: true, explanation: 'Đường link rút gọn rất đáng ngờ, che giấu địa chỉ web thật.' },
+                ],
+                totalClues: 3
+            },
+            {
+                parts: [
+                    { text: 'Từ: NganHang ABC <security.update@acc-abc.com>', clue: true, explanation: 'Tên miền lạ (@acc-abc.com), giả mạo ngân hàng.' },
+                    { text: 'Chủ đề: Cảnh báo bảo mật tài khoản', clue: false },
+                    { text: 'Kính gửi quý khách, hệ thống phát hiện tài khoản của bạn có đăng nhập bất thường. Yêu cầu đăng nhập và xác thực ngay tại:', clue: true, explanation: 'Lời lẽ hối thúc, yêu cầu hành động ngay lập tức là chiêu trò phổ biến.' },
+                    { text: 'www.nganhang-abc-login.com/verify', clue: true, explanation: 'Đây là một trang web giả mạo, không phải trang chính thức của ngân hàng.' },
+                    { text: 'Nếu không xác thực trong 24h, tài khoản sẽ bị khóa. Trân trọng.', clue: false },
+                ],
+                totalClues: 3
+            },
+            {
+                parts: [
+                    { text: 'Từ: SựKiệnGame Hot', clue: true, explanation: 'Tài khoản không chính thức, không phải từ nhà phát hành game.' },
+                    { text: 'Nội dung: Chào bạn, game ABC đang có sự kiện nạp thẻ x5 giá trị.', clue: true, explanation: 'Ưu đãi quá lớn và khó tin thường là lừa đảo.' },
+                    { text: 'Chỉ cần gửi mã thẻ và seri vào số Zalo 09xxxxxxx là được.', clue: true, explanation: 'Yêu cầu gửi thông tin thẻ cào qua kênh cá nhân là hành vi lừa đảo.' },
+                ],
+                totalClues: 3
+            },
+            {
+                parts: [
+                    { text: 'Từ: Minh Anh (ảnh đại diện quen)', clue: false },
+                    { text: 'Nội dung: Chào bạn, tui mới đổi máy, mất hết số rồi.', clue: true, explanation: 'Đây là lý do phổ biến mà kẻ gian sử dụng để bắt chuyện.' },
+                    { text: 'Cho tui xin lại số điện thoại và mã xác nhận Zalo tui gửi qua nhé.', clue: true, explanation: 'TUYỆT ĐỐI không bao giờ đưa mã xác nhận cho bất kỳ ai.' },
+                ],
+                totalClues: 2
+            },
+             {
+                parts: [
+                    { text: 'Từ: HocBongToanCau <hb.quocte@gmail.com>', clue: true, explanation: 'Email không chuyên nghiệp, sử dụng tên miền miễn phí (gmail).' },
+                    { text: 'Chủ đề: Chúc mừng em đã đủ điều kiện nhận học bổng Du học Hè.', clue: true, explanation: 'Học bổng bạn chưa từng đăng ký thì không thể trúng được.' },
+                    { text: 'Em chỉ cần đóng phí hồ sơ 500.000đ vào tài khoản STK: 123456789 để giữ chỗ.', clue: true, explanation: 'Học bổng thật không bao giờ yêu cầu đóng phí trước.' },
+                ],
+                totalClues: 3
+            },
+            {
+                parts: [
+                    { text: 'Từ: Cuộc Thi Nét Đẹp Học Sinh', clue: false },
+                    { text: 'Nội dung: Bạn A đang tham gia cuộc thi ảnh. Hãy vào link sau đây', clue: false },
+                    { text: 'đăng nhập tài khoản MXH của bạn để bình chọn nhé: cuocthianh.vn-online.net', clue: true, explanation: 'Yêu cầu đăng nhập để bình chọn là một cách đánh cắp tài khoản.' },
+                ],
+                totalClues: 1
+            },
+            {
+                parts: [
+                    { text: 'Từ: Bạn thân', clue: false },
+                    { text: 'Nội dung: Ê, tui đang kẹt tiền mua đồ gấp mà quên mang ví.', clue: true, explanation: 'Kẻ gian thường tạo ra tình huống khẩn cấp để bạn không có thời gian suy nghĩ.' },
+                    { text: 'Mày mua giúp tui cái thẻ điện thoại 200k gửi qua đây liền được không?', clue: true, explanation: 'Nhờ vả bất thường, đặc biệt là hỏi mượn tiền qua thẻ cào.' },
+                    { text: 'Tí tui trả.', clue: false },
+                ],
+                totalClues: 2
+            },
+            {
+                parts: [
+                    { text: 'Từ: Facebook Security', clue: false },
+                    { text: 'Nội dung: Tài khoản của bạn đã bị nhiều người báo cáo vi phạm. Để tránh bị khóa, hãy xác minh danh tính bằng cách', clue: true, explanation: 'Các tin nhắn đe dọa, dọa khóa tài khoản thường là giả mạo.' },
+                    { text: 'điền thông tin và mật khẩu vào form này.', clue: true, explanation: 'Nền tảng lớn không bao giờ yêu cầu bạn điền mật khẩu vào một form lạ.' },
+                ],
+                totalClues: 2
+            },
+            {
+                parts: [
+                    { text: 'Từ: Luyện Thi Thần Tốc', clue: false },
+                    { text: 'Nội dung: Trọn bộ tài liệu ôn thi vào 10 chỉ 99k!', clue: true, explanation: 'Giá quá rẻ so với giá trị là một dấu hiệu đáng ngờ.' },
+                    { text: 'Chuyển khoản ngay để không bỏ lỡ. Số lượng có hạn!', clue: true, explanation: 'Tạo áp lực, hối thúc bạn phải hành động ngay.' },
+                ],
+                totalClues: 2
+            },
+            {
+                parts: [
+                    { text: 'Từ: Người Lạ', clue: false },
+                    { text: 'Nội dung: Tôi có ảnh nhạy cảm của bạn.', clue: true, explanation: 'Đây là một hình thức đe dọa, tống tiền. Hãy báo ngay cho người lớn.' },
+                    { text: 'Nếu không muốn bị tung lên mạng, hãy chuyển 1 triệu vào tài khoản này.', clue: true, explanation: 'Tuyệt đối không làm theo yêu cầu của kẻ xấu.' },
+                ],
+                totalClues: 2
+            },
+            {
+                parts: [
+                    { text: 'Từ: FC Ca Sĩ XYZ', clue: true, explanation: 'Fanpage không có tick xanh, không phải kênh thông tin chính thức.' },
+                    { text: 'Nội dung: Cơ hội gặp gỡ thần tượng! Chỉ 100 vé duy nhất, giá 300k.', clue: true, explanation: 'Tạo sự khan hiếm giả để lừa người hâm mộ.' },
+                    { text: 'Chuyển khoản ngay vào STK cá nhân để nhận vé online.', clue: true, explanation: 'Sự kiện chuyên nghiệp không bao giờ dùng tài khoản cá nhân để nhận tiền.' },
+                ],
+                totalClues: 3
+            },
+            {
+                parts: [
+                    { text: 'Từ: Tuyển Dụng Việc Nhẹ Lương Cao', clue: true, explanation: 'Tên tài khoản đã thể hiện sự không đáng tin cậy.' },
+                    { text: 'Nội dung: Tuyển cộng tác viên online, chỉ cần xem video và thả tim. Mỗi ngày kiếm 200k-500k.', clue: true, explanation: 'Lời hứa hẹn về công việc dễ dàng với thu nhập cao vô lý.' },
+                    { text: 'Đăng ký bằng cách cung cấp ảnh CCCD 2 mặt.', clue: true, explanation: 'Yêu cầu thông tin cá nhân nhạy cảm như CCCD là cực kỳ nguy hiểm.' },
+                ],
+                totalClues: 3
+            }
+        ];
+
+        // === GENERAL GAME LOGIC ===
+        function initGame(gameType) {
+            startScreen.classList.add('hidden');
+            endScreen.classList.add('hidden');
+            score = 0;
+            activeGame = gameType;
+
+            quizScreen.classList.add('hidden');
+            dndScreen.classList.add('hidden');
+            spottingScreen.classList.add('hidden');
+
+            if (gameType === 'quiz') {
+                quizScreen.classList.remove('hidden');
+                currentQuestionIndex = 0;
+                scoreQuizDisplay.textContent = `Điểm: 0`;
+                showQuestion();
+            } else if (gameType === 'dnd') {
+                dndScreen.classList.remove('hidden');
+                scoreDndDisplay.textContent = `Điểm: 0`;
+                setupDndGame();
+            } else if (gameType === 'spotting') {
+                spottingScreen.classList.remove('hidden');
+                scoreSpottingDisplay.textContent = `Điểm: 0`;
+                currentScenarioIndex = 0;
+                setupSpottingGame();
+            }
+        }
+
+        function endGame() {
+            quizScreen.classList.add('hidden');
+            dndScreen.classList.add('hidden');
+            spottingScreen.classList.add('hidden');
+            endScreen.classList.remove('hidden');
+            finalScore.textContent = score;
+
+            let maxScore = 0;
+            if (activeGame === 'quiz') maxScore = quizQuestions.length * 10;
+            else if (activeGame === 'dnd') maxScore = dndItems.length * 10;
+            else if (activeGame === 'spotting') maxScore = spottingScenarios.reduce((sum, s) => sum + s.totalClues, 0) * 10;
+
+            if (score >= maxScore * 0.8) {
+                endMessage.textContent = 'Chúc mừng! Bạn đúng là một "Dũng Sĩ An Toàn Mạng" thực thụ. Hãy luôn giữ vững phong độ này nhé!';
+            } else if (score >= maxScore * 0.4) {
+                endMessage.textContent = 'Khá lắm! Bạn đã có kiến thức cơ bản về an toàn mạng. Cùng tìm hiểu thêm để an toàn hơn nữa nhé.';
+            } else {
+                endMessage.textContent = 'Bạn cần cẩn thận hơn trên không gian mạng. Hãy xem lại kiến thức và nói chuyện với người lớn để trang bị thêm kỹ năng nhé!';
+            }
+        }
+
+        // === QUIZ SPECIFIC FUNCTIONS ===
+        function showQuestion() {
+            resetQuizState();
+            const currentQuestion = quizQuestions[currentQuestionIndex];
+            questionCounter.textContent = `Câu hỏi ${currentQuestionIndex + 1}/${quizQuestions.length}`;
+            questionText.textContent = currentQuestion.question;
+
+            currentQuestion.answers.forEach(answer => {
+                const button = document.createElement('button');
+                button.textContent = answer.text;
+                button.classList.add('btn', 'answer-btn', 'w-full', 'text-left', 'p-4', 'rounded-lg', 'border-2', 'border-gray-300', 'bg-gray-50', 'hover:bg-blue-100', 'hover:border-blue-400');
+                if (answer.correct) button.dataset.correct = true;
+                button.addEventListener('click', selectAnswer);
+                answerButtonsContainer.appendChild(button);
+            });
+        }
+        function resetQuizState() {
+            feedbackQuiz.textContent = '';
+            while (answerButtonsContainer.firstChild) {
+                answerButtonsContainer.removeChild(answerButtonsContainer.firstChild);
+            }
+        }
+        function selectAnswer(e) {
+            const selectedBtn = e.target;
+            const isCorrect = selectedBtn.dataset.correct === 'true';
+
+            if (isCorrect) {
+                score += 10;
+                scoreQuizDisplay.textContent = `Điểm: ${score}`;
+                feedbackQuiz.textContent = quizQuestions[currentQuestionIndex].explanation;
+                feedbackQuiz.className = 'mt-6 text-center font-medium min-h-[40px] text-green-600';
+            } else {
+                feedbackQuiz.textContent = "Sai rồi! " + quizQuestions[currentQuestionIndex].explanation;
+                feedbackQuiz.className = 'mt-6 text-center font-medium min-h-[40px] text-red-600';
+            }
+            
+            Array.from(answerButtonsContainer.children).forEach(button => {
+                button.classList.toggle('correct', button.dataset.correct === 'true');
+                button.classList.toggle('wrong', button.dataset.correct !== 'true');
+                button.disabled = true;
+            });
+            
+            setTimeout(() => {
+                currentQuestionIndex++;
+                if (currentQuestionIndex < quizQuestions.length) showQuestion();
+                else endGame();
+            }, 3000);
+        }
+
+        // === DND SPECIFIC FUNCTIONS ===
+        function setupDndGame() {
+            itemsContainer.innerHTML = '';
+            document.getElementById('safe-zone').innerHTML = '<h3 class="font-bold text-green-800 text-center mb-2">✅ AN TOÀN</h3>';
+            document.getElementById('risky-zone').innerHTML = '<h3 class="font-bold text-red-800 text-center mb-2">❌ RỦI RO</h3>';
+            feedbackDnd.textContent = '';
+            remainingItems = dndItems.length;
+
+            dndItems.sort(() => Math.random() - 0.5).forEach(item => {
+                const itemEl = document.createElement('div');
+                itemEl.textContent = item.text;
+                itemEl.draggable = true;
+                itemEl.dataset.type = item.type;
+                itemEl.classList.add('draggable-item', 'p-2', 'bg-white', 'rounded-md', 'border', 'shadow-sm');
+                itemsContainer.appendChild(itemEl);
+            });
+            addDndListeners();
+        }
+        function addDndListeners() { /* ... unchanged ... */
+            const draggables = document.querySelectorAll('.draggable-item');
+            draggables.forEach(item => {
+                item.addEventListener('dragstart', () => { draggedItem = item; setTimeout(() => item.style.display = 'none', 0); });
+                item.addEventListener('dragend', () => { setTimeout(() => { draggedItem.style.display = 'block'; draggedItem = null; }, 0); });
+            });
+            dropZones.forEach(zone => {
+                zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+                zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+                zone.addEventListener('drop', e => {
+                    e.preventDefault(); zone.classList.remove('drag-over');
+                    if (draggedItem && draggedItem.dataset.type === zone.dataset.type) {
+                        draggedItem.style.display = 'block'; zone.appendChild(draggedItem);
+                        draggedItem.draggable = false; draggedItem.classList.add('correct-drop');
+                        score += 10; scoreDndDisplay.textContent = `Điểm: ${score}`;
+                        feedbackDnd.textContent = 'Chính xác!';
+                        feedbackDnd.className = "mt-4 text-center font-medium min-h-[24px] text-green-600";
+                        remainingItems--;
+                        if (remainingItems === 0) setTimeout(endGame, 1000);
+                    } else {
+                        feedbackDnd.textContent = 'Sai rồi! Hãy thử lại.';
+                        feedbackDnd.className = "mt-4 text-center font-medium min-h-[24px] text-red-600";
+                    }
+                    setTimeout(() => feedbackDnd.textContent = '', 2000);
+                });
+            });
+        }
+        
+        // === SPOTTING GAME SPECIFIC FUNCTIONS ===
+        function setupSpottingGame() {
+            foundClues = 0;
+            displayMessage();
+        }
+
+        function displayMessage() {
+            // Shuffle scenarios for replayability
+            if (currentScenarioIndex === 0) {
+                 spottingScenarios.sort(() => Math.random() - 0.5);
+            }
+            const scenario = spottingScenarios[currentScenarioIndex];
+            messageContainer.innerHTML = '';
+            explanationSpotting.textContent = '';
+            
+            scenario.parts.forEach(part => {
+                const p = document.createElement('p');
+                p.textContent = part.text;
+                p.classList.add('message-part');
+                if(part.clue) {
+                    p.dataset.clue = part.clue;
+                    p.dataset.explanation = part.explanation;
+                }
+                p.addEventListener('click', handlePartClick);
+                messageContainer.appendChild(p);
+            });
+
+            cluesCounter.textContent = `Đã tìm thấy: 0/${scenario.totalClues}`;
+            nextMessageBtn.disabled = true;
+            nextMessageBtn.classList.add('bg-gray-300', 'cursor-not-allowed');
+            nextMessageBtn.classList.remove('bg-blue-500', 'hover:bg-blue-600');
+        }
+
+        function handlePartClick(e) {
+            const part = e.target;
+            if (part.classList.contains('found')) return;
+
+            if (part.dataset.clue === 'true') {
+                part.classList.add('found');
+                score += 10;
+                scoreSpottingDisplay.textContent = `Điểm: ${score}`;
+                foundClues++;
+                cluesCounter.textContent = `Đã tìm thấy: ${foundClues}/${spottingScenarios[currentScenarioIndex].totalClues}`;
+                explanationSpotting.textContent = `Đúng rồi! ${part.dataset.explanation}`;
+                
+                if (foundClues === spottingScenarios[currentScenarioIndex].totalClues) {
+                    nextMessageBtn.disabled = false;
+                    nextMessageBtn.classList.remove('bg-gray-300', 'cursor-not-allowed');
+                    nextMessageBtn.classList.add('bg-blue-500', 'hover:bg-blue-600');
+                }
+            } else {
+                part.classList.add('not-clue');
+                explanationSpotting.textContent = 'Đây chưa phải điểm đáng ngờ...';
+                setTimeout(() => {
+                    part.classList.remove('not-clue');
+                    if (![...part.parentElement.children].some(el => el.classList.contains('found') && el.dataset.clue === 'true' && el !== part)) {
+                         explanationSpotting.textContent = '';
+                    }
+                }, 1000);
+            }
+        }
+
+        // === EVENT LISTENERS ===
+        startQuizBtn.addEventListener('click', () => initGame('quiz'));
+        startDndBtn.addEventListener('click', () => initGame('dnd'));
+        startSpottingBtn.addEventListener('click', () => initGame('spotting'));
+        restartBtn.addEventListener('click', () => {
+            endScreen.classList.add('hidden');
+            startScreen.classList.remove('hidden');
+        });
+        nextMessageBtn.addEventListener('click', () => {
+            currentScenarioIndex++;
+            if (currentScenarioIndex < spottingScenarios.length) {
+                setupSpottingGame();
+            } else {
+                endGame();
+            }
+        });
+
+    </script>
+</body>
+</html>
